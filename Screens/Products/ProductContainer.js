@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   StyleSheet,
@@ -8,18 +8,21 @@ import {
   ScrollView,
 } from "react-native";
 import { Container, Header, Icon, Item, Input, Text } from "native-base";
+import { useFocusEffect } from "@react-navigation/native";
+import baseURL from "../../assets/common/baseUrl";
+import axios from "axios";
 
 import ProductList from "./ProductList";
 import SearchedProduct from "./SearchedProduct";
 import Banner from "../../Shared/Banner";
 import CategoryFilter from "./CategoryFilter";
 
-const data = require("../../assets/data/products.json");
-const productCategories = require("../../assets/data/categories.json");
+// const data = require("../../assets/data/products.json");
+// const productCategories = require("../../assets/data/categories.json");
 
 var { height } = Dimensions.get("window");
 
-const ProductContainer = () => {
+const ProductContainer = (props) => {
   const [products, setProducts] = useState([]);
   const [productsFiltered, setProductsFiltered] = useState([]);
   const [focus, setFocus] = useState();
@@ -27,25 +30,52 @@ const ProductContainer = () => {
   const [productCtg, setProductCtg] = useState([]);
   const [active, setActive] = useState();
   const [initialState, setInitialState] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    setProducts(data);
-    setProductsFiltered(data);
-    setFocus(false);
-    setCategories(productCategories);
-    setProductCtg(data);
-    setActive(-1);
-    setInitialState(data);
 
-    return () => {
-      setProducts([]);
-      setProductsFiltered([]);
-      setFocus();
-      setCategories([]);
-      setActive();
-      setInitialState();
-    };
-  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      setFocus(false);
+      //setCategories(productCategories);
+      setActive(-1);
+
+      //Products
+      axios
+        .get(`${baseURL}products`)
+        .then((res) => {
+          setProducts(res.data);
+          setProductCtg(res.data);
+          setProductsFiltered(res.data);
+          setInitialState(res.data);
+          setLoading(false);
+        })
+        .catch((error) => {
+          console.log(error + "prod");
+        });
+
+      //Category
+      axios
+        .get(`${baseURL}categories`)
+        .then((res) => {
+          setCategories(res.data);
+        })
+        .catch((error) => {
+          console.log(baseURL);
+          console.log(error + "category error");
+        });
+        return () => {
+          setProducts([]);
+          setProductsFiltered([]);
+          setFocus();
+          setCategories([]);
+          setActive();
+          setInitialState();
+        };
+    }, [])
+  );
+
+  
 
   const searchProduct = (text) => {
     setProductsFiltered(
@@ -67,13 +97,16 @@ const ProductContainer = () => {
       ? [setProductCtg(initialState), setActive(true)]
       : [
           setProductCtg(
-            products.filter((i) => i.category.$oid === ctg),
+            products.filter((i) => i.category._id === ctg),
             setActive(true)
           ),
         ];
   };
 
   return (
+    <>
+    {loading == false ? (
+
     <Container>
       <Header searchBar rounded>
         <Item>
@@ -87,7 +120,10 @@ const ProductContainer = () => {
         </Item>
       </Header>
       {focus == true ? (
-        <SearchedProduct productsFiltered={productsFiltered} />
+        <SearchedProduct
+          navigation={props.navigation}
+          productsFiltered={productsFiltered}
+        />
       ) : (
         <ScrollView>
           <View>
@@ -106,11 +142,18 @@ const ProductContainer = () => {
             {productCtg.length > 0 ? (
               <View style={styles.listContainer}>
                 {productCtg.map((item) => {
-                  return (<ProductList key={item.$oid} item={item} />)
+                  return (
+                    <ProductList
+                      navigation={props.navigation}
+                      key={item._id}
+                      // key={item.$oid}
+                      item={item}
+                    />
+                  );
                 })}
               </View>
             ) : (
-              <View style={[styles.center, { height: height/2 }]}>
+              <View style={[styles.center, { height: height / 2 }]}>
                 <Text>No Products Found</Text>
               </View>
             )}
@@ -118,7 +161,13 @@ const ProductContainer = () => {
         </ScrollView>
       )}
     </Container>
-    
+    ):(
+      // Loading
+      <Container style={[styles.center,{backgroundColor:"#f2f2f2"}]}>
+          <ActivityIndicator size="large" color="red" />
+      </Container>
+    )}
+    </>
   );
 };
 const styles = StyleSheet.create({
